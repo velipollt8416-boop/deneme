@@ -1,17 +1,23 @@
 # rapor.py
 
+import os
+import csv
 import psycopg2
 import yfinance as yf
 import numpy as np
 from tabulate import tabulate
 from datetime import datetime  # <-- EKLENEN VE HATAYI DÜZELTEN SATIR
+from dotenv import load_dotenv
 
-# --- VERİTABANI AYARLARI (sinyal_yeni.py ile aynı olmalı) ---
-DB_NAME = "sinyalbot"
-DB_USER = "postgres"
-DB_PASSWORD = "12345"
-DB_HOST = "localhost"
-DB_PORT = "5432"
+# .env dosyasındaki değişkenleri yükle
+load_dotenv()
+
+# --- VERİTABANI AYARLARI (Ortam Değişkenlerinden Oku) ---
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
 # -------------------------------------------------------------
 
 def get_db_connection():
@@ -20,7 +26,7 @@ def get_db_connection():
     )
 
 def check_open_positions():
-    """Açık pozisyonları çeker, anlık fiyatları hesaplar ve terminalde gösterir."""
+    """Açık pozisyonları çeker, anlık fiyatları hesaplar, terminalde gösterir ve CSV olarak kaydeder."""
     conn = get_db_connection()
     cur = conn.cursor()
 
@@ -114,9 +120,19 @@ def check_open_positions():
                 report_data.append([ticker, signal_type.upper(), f"{entry_price}", "Hata", "N/A"])
 
         print("\n--- AÇIK POZİSYONLAR ANLIK DURUM RAPORU ---")
-        # Artık bu satır sorunsuz çalışacak
-        print(f"Rapor Zamanı: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        report_time = datetime.now()
+        print(f"Rapor Zamanı: {report_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(tabulate(report_data, headers=headers, tablefmt="grid"))
+
+        csv_filename = f"open_positions_report_{report_time.strftime('%Y%m%d_%H%M%S')}.csv"
+        try:
+            with open(csv_filename, "w", newline="", encoding="utf-8") as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(headers)
+                writer.writerows(report_data)
+            print(f"Rapor CSV olarak kaydedildi: {csv_filename}")
+        except Exception as e:
+            print(f"CSV yazma hatası: {e}")
 
     except Exception as e:
         print(f"Rapor oluşturulurken bir hata oluştu: {e}")
